@@ -2,5 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 project(MergingBMP_SSE C)
 
 set(CMAKE_C_STANDARD 99)
-
+SET(MYCOMPILE_FLAGS "-msse4")
+SET(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} ${MYCOMPILE_FLAGS}")
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${MYCOMPILE_FLAGS}")
 add_executable(MergingBMP_SSE main.c)
