@@ -28,7 +28,6 @@ typedef struct {             // Total: 54 bytes
 typedef struct {
     BMPHeader header;
     unsigned char *data;
-
 } BMPImage;
 
 
@@ -52,7 +51,9 @@ unsigned char *LoadBitmapFile(char *filename, BMPHeader *bmp_header) {
 
 
     //fseek(file_ptr, bmp_header->offset, SEEK_SET);
-
+    //unsigned char * bmp_trash_data  = (unsigned char *) _mm_malloc(bmp_header->offset - sizeof(BMPHeader), 16);
+    //fread(bmp_trash_data, bmp_header->offset - sizeof(BMPHeader), 1, file_ptr);
+    //_mm_free(bmp_trash_data);
     //allocation of the memory
     bmp_image_data = (unsigned char *) _mm_malloc(bmp_header->image_size_bytes, 16);
     // special malloc -
@@ -65,25 +66,10 @@ unsigned char *LoadBitmapFile(char *filename, BMPHeader *bmp_header) {
     }
 
     //read in the bitmap image data
-    fread(bmp_image_data, bmp_header->image_size_bytes, 1, file_ptr);
-    for (size_t i = 0; i < bmp_header->size; ++i) {
-        printf("%d ", bmp_image_data[i]);
-    }
-    printf("\n");
-
-    int imageIdx = 0;  //image index counter
-    unsigned char tempRGB;  //our swap variable
-
-    //swap the r and b values to get RGB (bitmap is BGR)
-    for (imageIdx = 0; imageIdx < bmp_header->image_size_bytes; imageIdx += 3) // fixed semicolon
-    {
-        //EACH CHAR = COLOR, 3 CHARS = PIXEL. xxd has 16bytes system - 00 means 0 <= 0 + 16 * 0 <= 255
-        tempRGB = bmp_image_data[imageIdx];
-        //bmp_image_data[imageIdx] = bmp_image_data[imageIdx + 2];
-        //bmp_image_data[imageIdx + 2] = tempRGB;
+    fread(bmp_image_data, bmp_header->image_size_bytes + bmp_header->offset - sizeof(BMPHeader), 1, file_ptr);
 
 
-    }
+
 
     //close file and return bitmap iamge data
     fclose(file_ptr);
@@ -98,129 +84,94 @@ BMPImage ReadBMPImage(char *filename) {
     return bmp_image;
 }
 
-/*void MergeBMPImages(const BMPImage *fst_image, const BMPImage *snd_image, char *result_filename) {
-    FILE *file_ptr = fopen(result_filename, "wb");
-    fwrite(&fst_image->header, sizeof(BMPHeader), 1, file_ptr);
-    int32_t current_byte = 0;
-    int32_t byte_string_length = fst_image->header.width_px * (fst_image->header.bits_per_pixel) / 4;
-    //num of bytes of each pixel row
-    int32_t padding_len = byte_string_length % 4 == 0 ? 0 : 4 - byte_string_length % 4;
-    for (int32_t current_row = 0; current_row < fst_image->header.height_px; ++current_row){
-        if(fst_image->header.width_px < 4){
-            for(int32_t pixel = 0; pixel < fst_image->header.width_px; ++pixel){
-                int8_t bool_is_second_zero = 1;
-                for(int32_t i =0; i < fst_image ->header.bits_per_pixel/4; ++i){
-                    if(snd_image -> data[current_byte + i] != 0){
-                        bool_is_second_zero = 0;
-                    }
-                }
-                if(bool_is_second_zero){
-                    fwrite(snd_image->data + current_byte, snd_image->header.bits_per_pixel, 1, file_ptr);
-                } else{
-                    fwrite(fst_image->data + current_byte, fst_image->header.bits_per_pixel, 1, file_ptr);
-
-                }
-                current_byte += fst_image->header.bits_per_pixel;
-            }
-            current_byte += padding_len;
-        }
-        int32_t current_pixel = 0;
-        for(current_pixel = 0; current_pixel + 3 < fst_image->header.width_px; current_pixel += 4 ){
-            // while we can use see operations
-        }
-        if(current_pixel != fst_image->header.width_px){
-            for(int32_t pixel = 0; pixel < fst_image->header.width_px - current_pixel; ++pixel){
-                int8_t bool_is_second_zero = 1;
-                for(int32_t i =0; i < fst_image ->header.bits_per_pixel/4; ++i){
-                    if(snd_image -> data[current_byte + i] != 0){
-                        bool_is_second_zero = 0;
-                    }
-                }
-                if(bool_is_second_zero){
-                    fwrite(snd_image->data + current_byte, snd_image->header.bits_per_pixel, 1, file_ptr);
-                } else{
-                    fwrite(fst_image->data + current_byte, fst_image->header.bits_per_pixel, 1, file_ptr);
-
-                }
-                current_byte += fst_image->header.bits_per_pixel;
-            }
-        }
-        current_byte += padding_len;
-
-    }
-}*/
 
 void MergeBMPImages(const BMPImage *fst_image, const BMPImage *snd_image, char *result_filename) {
     FILE *file_ptr = fopen(result_filename, "wb");
     fwrite(&fst_image->header, sizeof(BMPHeader), 1, file_ptr);
+    fwrite(fst_image->data,fst_image->header.offset - sizeof(BMPHeader), 1, file_ptr);
+
+    //unsigned char * bmp_trash_data  = (unsigned char *) _mm_malloc(fst_image->header.offset - sizeof(BMPHeader), 16);
+    //fread(bmp_trash_data, fst_image->header.offset - sizeof(BMPHeader), 1, file_ptr);
+    //_mm_free(bmp_trash_data);
+    unsigned char *data1 = fst_image->data + (fst_image->header.offset - sizeof(BMPHeader));
+    unsigned char *data2 = snd_image->data + (snd_image->header.offset - sizeof(BMPHeader));
     int32_t current_byte = 0;
     int32_t byte_string_length = fst_image->header.width_px * (fst_image->header.bits_per_pixel) / 8;
     //num of bytes of each pixel row
     int32_t padding_len = byte_string_length % 4 == 0 ? 0 : 4 - byte_string_length % 4;
-    for (int32_t current_row = 0; current_row < fst_image->header.height_px; ++current_row){
+    for (int32_t current_row = 0; current_row < fst_image->header.height_px; ++current_row) {
         int32_t current_pixel = 0;
-        for(current_pixel = 0; current_pixel + 3 < fst_image->header.width_px; current_pixel += 4 ){
-            for(int32_t pixel = 0; pixel < 4; ++pixel){
+        for (current_pixel = 0; current_pixel + 3 < fst_image->header.width_px; current_pixel += 4) {
+            for (int32_t pixel = 0; pixel < 4; ++pixel) {
                 int8_t bool_is_second_zero = 1;
-                for(int32_t i =0; i < snd_image ->header.bits_per_pixel/8; ++i){
-                    if(snd_image -> data[current_byte + i] != 0){
+                if (data2[current_byte + 3] != 0) {
+                    bool_is_second_zero = 0;
+                }
+                if (!bool_is_second_zero) {
+                    fwrite(data2 + current_byte, snd_image->header.bits_per_pixel / 8, 1, file_ptr);
+                } else {
+                    fwrite(data1 + current_byte, fst_image->header.bits_per_pixel / 8, 1, file_ptr);
+                }
+                current_byte += fst_image->header.bits_per_pixel / 8;
+            }
+        }
+        /*if (current_pixel != fst_image->header.width_px) {
+            for (int32_t pixel = 0; pixel < fst_image->header.width_px - current_pixel; ++pixel) {
+                int8_t bool_is_second_zero = 1;
+                for (int32_t i = 0; i < fst_image->header.bits_per_pixel / 8; ++i) {
+                    if (snd_image->data[current_byte + i] != 0) {
                         bool_is_second_zero = 0;
                     }
                 }
-                if(!bool_is_second_zero){
-                    fwrite(snd_image->data + current_byte, snd_image->header.bits_per_pixel/8, 1, file_ptr);
-                } else{
-                    fwrite(fst_image->data + current_byte, fst_image->header.bits_per_pixel/8, 1, file_ptr);
+                if (bool_is_second_zero) {
+                    fwrite(snd_image->data + current_byte, snd_image->header.bits_per_pixel / 8, 1, file_ptr);
+                } else {
+                    fwrite(fst_image->data + current_byte, fst_image->header.bits_per_pixel / 8, 1, file_ptr);
 
                 }
-                current_byte += fst_image->header.bits_per_pixel/8;
+                current_byte += fst_image->header.bits_per_pixel / 8;
             }
         }
-        if(current_pixel != fst_image->header.width_px){
-            for(int32_t pixel = 0; pixel < fst_image->header.width_px - current_pixel; ++pixel){
-                int8_t bool_is_second_zero = 1;
-                for(int32_t i =0; i < fst_image ->header.bits_per_pixel/8; ++i){
-                    if(snd_image -> data[current_byte + i] != 0){
-                        bool_is_second_zero = 0;
-                    }
-                }
-                if(!bool_is_second_zero){
-                    fwrite(snd_image->data + current_byte, snd_image->header.bits_per_pixel/8, 1, file_ptr);
-                } else{
-                    fwrite(fst_image->data + current_byte, fst_image->header.bits_per_pixel/8, 1, file_ptr);
-
-                }
-                current_byte += fst_image->header.bits_per_pixel/8;
-            }
-        }
-        current_byte += padding_len;
+        current_byte += padding_len;*/
 
     }
 }
+
 int main() {
 
     BMPImage image = ReadBMPImage("/home/egor/C_projects/MergingBMP_SSE/example32.bmp");
-    BMPImage snd  = ReadBMPImage("/home/egor/C_projects/MergingBMP_SSE/second.bmp");
-    MergeBMPImages(&image, &snd, "/home/egor/C_projects/MergingBMP_SSE/result.bmp");
+    BMPImage snd = ReadBMPImage("/home/egor/C_projects/MergingBMP_SSE/second.bmp");
+    MergeBMPImages(&image, &snd, "/home/egor/C_projects/MergingBMP_SSE/devil_result.bmp");
+    /*for (size_t i = 0; i < image.header.image_size_bytes; ++i) {
+        printf("%d ", image.data[i]);
+    }
+    printf("\n");
+    for (size_t i = 0; i < snd.header.image_size_bytes; ++i) {
+        printf("%d ", snd.data[i]);
+    }*/
+    printf("\n");
+    printf("%d\n", image.header.height_px);
+    printf("%d\n", snd.header.height_px);
+
     /*
     for(size_t i = 0; i < image.header.image_size_bytes; ++i){
         if(i < image.header.image_size_bytes / 4){
-            image.data[i] = 115;
+            image.data[i] = 0;
         }
         else if(i < image.header.image_size_bytes / 2){
-            image.data[i] = 0;
+            image.data[i] = 115;
         }
         else{
             image.data[i] = 200;
         }
     }
 
-    FILE * snd_file = fopen("/home/egor/C_projects/MergingBMP_SSE/second_32.bmp", "wb");
+    FILE * snd_file = fopen("/home/egor/C_projects/MergingBMP_SSE/second.bmp", "wb");
     fwrite(&image.header, sizeof(BMPHeader), 1, snd_file);
     fwrite(image.data, image.header.image_size_bytes, 1, snd_file);
     printf("%d %d %d \n", image.header.height_px, image.header.width_px, image.header.bits_per_pixel);
     //now do what you want with it, later on i will show you how to display it in a normal window
 
-    fclose(snd_file);
-*/
+    fclose(snd_file);*/
+
 }
