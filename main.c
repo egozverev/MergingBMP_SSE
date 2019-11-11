@@ -80,16 +80,13 @@ unsigned char *LoadBitmapFile(const char *filename) {
 
 }
 
-
 void MergeBMPImages(const unsigned char *all_data1, const unsigned char *all_data2, const char *result_filename) {
     FILE *file_ptr = fopen(result_filename, "wb");
     BMPHeader *header1 = (BMPHeader *) all_data1;
     BMPHeader *header2 = (BMPHeader *) all_data2;
     fwrite(all_data1, header1->offset, 1, file_ptr);
 
-    //unsigned char * bmp_trash_data  = (unsigned char *) _mm_malloc(fst_image->header.offset - sizeof(BMPHeader), 16);
-    //fread(bmp_trash_data, fst_image->header.offset - sizeof(BMPHeader), 1, file_ptr);
-    //_mm_free(bmp_trash_data);
+
     const unsigned char *data1 = all_data1 + header1->offset;
     const unsigned char *data2 = all_data2 + header2->offset;
     int32_t current_byte = 0;
@@ -98,54 +95,35 @@ void MergeBMPImages(const unsigned char *all_data1, const unsigned char *all_dat
     int32_t padding_len = byte_string_length % 4 == 0 ? 0 : 4 - byte_string_length % 4;
     for (int32_t current_row = 0; current_row < header1->height_px; ++current_row) {
         int32_t current_pixel = 0;
-        for (current_pixel = 0; current_pixel + 3 < header1->width_px; current_pixel += 4) {
-            for (int32_t pixel = 0; pixel < 4; ++pixel) {
-                unsigned char color[4];
-                double alpha = data2[current_byte + 3] / 255.;
-                for (int i = 0; i < 4; ++i) {
-                    if (i == 3) {
-                        color[3] = 255;
-                    } else {
-                        color[i] = (unsigned char)(data1[current_byte + i] * (1-alpha) + data2[current_byte + i] * alpha);
-                    }
-                }
-                fwrite(color, header2->bits_per_pixel / 8, 1, file_ptr);
-
-                current_byte += header1->bits_per_pixel / 8;
+        for (current_pixel = 0; current_pixel < header1->width_px; current_pixel += 1) {
+            const __m64 *data1_vector_ptr = (__m64 *) (data1 + current_byte); // unsigned ints!
+            const __m64 *data2_vector_ptr = (__m64 *) (data2 + current_byte);
+            __m128 data1_vector_float = _mm_cvtpu8_ps(*data1_vector_ptr);
+            __m128 data2_vector_float = _mm_cvtpu8_ps(*data2_vector_ptr);
+            float alpha = data2_vector_float[3] / 255;
+            __m128 mask = _mm_set_ps1(1 - alpha);
+            data1_vector_float = _mm_mul_ps(data1_vector_float, mask);
+            mask = _mm_set_ps1(alpha);
+            data2_vector_float = _mm_mul_ps(data2_vector_float, mask);
+            data1_vector_float = _mm_add_ps(data1_vector_float, data2_vector_float);
+            data1_vector_float = _mm_round_ps(data1_vector_float, _MM_FROUND_TO_NEAREST_INT);
+            unsigned char result[4];
+            for(int i = 0; i < 3; ++i){
+                result[i] = (unsigned char)data1_vector_float[i];
             }
-        }
-        if (current_pixel != header1->width_px) {
-            for (int32_t pixel = 0; pixel < header1->width_px - current_pixel; ++pixel) {
-                unsigned char color[4];
-                double alpha = data2[current_byte + 3] / 255.;
-                for (int i = 0; i < 4; ++i) {
-                    if (i == 3) {
-                        color[3] = 255;
-                    } else {
-                        color[i] = (unsigned char)(data1[current_byte + i] * (1-alpha) + data2[current_byte + i] * alpha);
-                    }
-                }
-                fwrite(color, header2->bits_per_pixel / 8, 1, file_ptr);
-
-                current_byte += header1->bits_per_pixel / 8;
-            }
+            result[3] = 255;
+            fwrite(result, header2->bits_per_pixel / 8, 1, file_ptr);
+            current_byte += header1->bits_per_pixel / 8;
         }
         current_byte += padding_len;
 
     }
 }
+int main(int argc, char** argv) {
+    const unsigned char *all_data1 = LoadBitmapFile(argv[1]);
+    const unsigned char *all_data2 = LoadBitmapFile(argv[2]);
+    MergeBMPImages(all_data1, all_data2, argv[3]);
 
-int main() {
-
-    const unsigned char *all_data1 = LoadBitmapFile("/home/egor/C_projects/MergingBMP_SSE/example32.bmp");
-    const unsigned char *all_data2 = LoadBitmapFile("/home/egor/C_projects/MergingBMP_SSE/second.bmp");
-    MergeBMPImages(all_data1, all_data2, "/home/egor/C_projects/MergingBMP_SSE/not_devil_res.bmp");
-
-
-
-    const unsigned char *all_data3 = LoadBitmapFile("/home/egor/C_projects/MergingBMP_SSE/devil1.bmp");
-    const unsigned char *all_data4 = LoadBitmapFile("/home/egor/C_projects/MergingBMP_SSE/devil2.bmp");
-    MergeBMPImages(all_data3, all_data4, "/home/egor/C_projects/MergingBMP_SSE/devil_result.bmp");
 
 
 }
